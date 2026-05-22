@@ -1,104 +1,74 @@
-# encoding: utf-8
 module Prismic
   module Fragments
     class StructuredText < Fragment
-
-      # Used during the call of {StructuredText#as_html} : blocks are first gathered by groups,
-      # so that list items of the same list are placed within the same group, allowing to frame
-      # their serialization with <ul>...</ul> or <ol>...</ol>.
-      # Images, paragraphs, headings, embed, ... are then placed alone in their own BlockGroup.
       class BlockGroup
         attr_reader :kind, :blocks
+
         def initialize(kind)
           @kind = kind
           @blocks = []
         end
+
         def <<(block)
           blocks << block
         end
       end
+
       attr_accessor :blocks
 
       def initialize(blocks)
         @blocks = blocks
       end
 
-      # Serializes the current StructuredText fragment into a fully usable HTML code.
-      # You need to pass a proper link_resolver so that internal links are turned into the proper URL in
-      # your website. If you use a starter kit, one is provided, that you can still update later.
-      #
-      # This method simply executes the as_html methods on blocks;
-      # it is not advised to override this method if you want to change the HTML output, you should
-      # override the as_html method at the block level (like {Heading.as_html}, or {Preformatted.as_html},
-      # for instance).
-      # @param link_resolver [LinkResolver]
-      # @param html_serializer [HtmlSerializer]
-      # @return [String] the resulting html snippet
-
-      def as_html(link_resolver, html_serializer=nil)
-        # Defining blocks that deserve grouping, assigning them "group kind" names
-        block_group = ->(block){
-          case block
-          when Block::ListItem
-            block.ordered? ? "ol" : "ul"
-          else
-            nil
-          end
-        }
-        # Initializing groups, which is an array of BlockGroup objects
-        groups, last = [], nil
-        blocks.each {|block|
-          group = block_group.(block)
+      def as_html(link_resolver, html_serializer = nil)
+        groups = []
+        last = nil
+        blocks.each do |block|
+          group = if block.is_a?(Block::ListItem)
+                    block.ordered? ? 'ol' : 'ul'
+                  end
           groups << BlockGroup.new(group) if !last || group != last
           groups.last << block
           last = group
-        }
-        # HTML-serializing the groups object (delegating the serialization of Block objects),
-        # without forgetting to frame the BlockGroup objects right if needed
-        groups.map{|group|
-          html = group.blocks.map { |b|
-            b.as_html(link_resolver, html_serializer)
-          }.join
+        end
+
+        result = String.new
+        groups.each_with_index do |group, i|
+          result << "\n\n" if i > 0
           case group.kind
-          when "ol"
-            %(<ol>#{html}</ol>)
-          when "ul"
-            %(<ul>#{html}</ul>)
+          when 'ol'
+            result << '<ol>'
+            group.blocks.each { |b| result << b.as_html(link_resolver, html_serializer) }
+            result << '</ol>'
+          when 'ul'
+            result << '<ul>'
+            group.blocks.each { |b| result << b.as_html(link_resolver, html_serializer) }
+            result << '</ul>'
           else
-            html
+            group.blocks.each { |b| result << b.as_html(link_resolver, html_serializer) }
           end
-        }.join("\n\n")
+        end
+        result
       end
 
-      # Returns the StructuredText as plain text, with zero formatting.
-      # Non-textual blocks (like images and embeds) are simply ignored.
-      #
-      # @param separator [String] The string separator inserted between the blocks (a blank space by default)
-      # @return [String] The complete string representing the textual value of the StructuredText field.
-      def as_text(separator=' ')
-        blocks.map{|block| block.as_text }.compact.join(separator)
+      def as_text(separator = ' ')
+        blocks.map { |block| block.as_text }.compact.join(separator)
       end
 
-      # Finds the first highest title in a structured text
       def first_title
-        max_level = 6 # any title with a higher level kicks the current one out
+        max_level = 6
         title = false
         @blocks.each do |block|
-          if block.is_a?(Prismic::Fragments::StructuredText::Block::Heading)
-            if block.level < max_level
-              title = block.text
-              max_level = block.level # new maximum
-            end
+          if block.is_a?(Prismic::Fragments::StructuredText::Block::Heading) && (block.level < max_level)
+            title = block.text
+            max_level = block.level
           end
         end
         title
       end
 
       class Span
-        # @return [Number]
-        attr_accessor :start
-        # @return [Number]
-        attr_accessor :end
+        attr_accessor :start, :end
 
         def initialize(start, finish)
           @start = start
@@ -106,35 +76,38 @@ module Prismic
         end
 
         class Label < Span
-          # @return [String]
           attr_accessor :label
+
           def initialize(start, finish, label)
             super(start, finish)
             @label = label
           end
-          def serialize(text, link_resolver = nil)
+
+          def serialize(text, _link_resolver = nil)
             "<span class=\"#{@label}\">#{text}</span>"
           end
         end
 
         class Em < Span
-          def serialize(text, link_resolver = nil)
+          def serialize(text, _link_resolver = nil)
             "<em>#{text}</em>"
           end
         end
 
         class Strong < Span
-          def serialize(text, link_resolver = nil)
+          def serialize(text, _link_resolver = nil)
             "<strong>#{text}</strong>"
           end
         end
 
         class Hyperlink < Span
           attr_accessor :link
+
           def initialize(start, finish, link)
             super(start, finish)
             @link = link
           end
+
           def serialize(text, link_resolver = nil)
             if link.is_a? Prismic::Fragments::DocumentLink and link.broken
               "<span>#{text}</span>"
@@ -145,30 +118,28 @@ module Prismic
             end
           end
         end
-
       end
 
       class Block
-
-        # Returns nil, as a block is not textual by default.
-        # This is meant to be overriden by textual blocks (see Prismic::Fragments::StructuredText::Block::Text.as_text, for instance)
-        #
-        # @return nil, always.
         def as_text
           nil
         end
 
         class Text
-          # @return [String]
-          attr_accessor :text
-          # @return [Array<Span>]
-          attr_accessor :spans
-          # @return [String] may be nil
-          attr_accessor :label
+          ESCAPE_MAP = {
+            "'" => '&#39;',
+            '&' => '&amp;',
+            '"' => '&quot;',
+            '<' => '&lt;',
+            '>' => '&gt;'
+          }.freeze
+          ESCAPE_PATTERN = /['&"<>]/.freeze
+
+          attr_accessor :text, :spans, :label
 
           def initialize(text, spans, label = nil)
             @text = text
-            @spans = spans.select{|span| span.start < span.end}
+            @spans = spans.select { |span| span.start < span.end }
             @label = label
           end
 
@@ -176,91 +147,93 @@ module Prismic
             (@label && %( class="#{label}")) || ''
           end
 
-          def as_html(link_resolver=nil, html_serializer=nil)
-            html = ''
-            # Getting Hashes of spanning tags to insert, sorted by starting position, and by ending position
+          def as_html(link_resolver = nil, html_serializer = nil)
             start_spans, end_spans = prepare_spans
-            # Open tags
-            stack = Array.new
-            (text.length + 1).times do |pos| # Looping to length + 1 to catch closing tags
-              end_spans[pos].each do |t|
-                # Close a tag
-                tag = stack.pop
-                inner_html = serialize(tag[:span], tag[:html], link_resolver, html_serializer)
-                if stack.empty?
-                  # The tag was top-level
-                  html += inner_html
-                else
-                  # Add the content to the parent tag
-                  stack[-1][:html] += inner_html
+            boundaries = boundary_positions
+            html = String.new
+            stack = []
+            last_idx = boundaries.length - 1
+
+            boundaries.each_with_index do |pos, idx|
+              if (ending = end_spans[pos])
+                ending.each do
+                  tag = stack.pop
+                  inner = serialize(tag[:span], tag[:html], link_resolver, html_serializer)
+                  if stack.empty?
+                    html << inner
+                  else
+                    stack[-1][:html] << inner
+                  end
                 end
               end
-              start_spans[pos].each do |tag|
-                # Open a tag
-                stack.push({
-                    :span => tag,
-                    :html => ''
-                })
-              end
-              if pos < text.length
-                if stack.empty?
-                  # Top level text
-                  html += cgi_escape_html(text[pos])
-                else
-                  # Inner text of a span
-                  stack[-1][:html] += cgi_escape_html(text[pos])
+
+              if (starting = start_spans[pos])
+                starting.each do |span|
+                  stack.push(span: span, html: String.new)
                 end
+              end
+
+              break if idx == last_idx
+
+              next_pos = boundaries[idx + 1]
+              next if pos == next_pos
+
+              escaped = cgi_escape_html(text[pos...next_pos])
+              if stack.empty?
+                html << escaped
+              else
+                stack[-1][:html] << escaped
               end
             end
-            html.gsub("\n", '<br>')
+
+            html.gsub!("\n", '<br>')
+            html
           end
 
           def cgi_escape_html(string)
-            # We don't use CGI::escapeHTML because the implementation changed from 1.9 to 2.0 and that break tests
-            string.gsub(/['&\"<>]/, {
-                "'" => '&#39;',
-                '&' => '&amp;',
-                '"' => '&quot;',
-                '<' => '&lt;',
-                '>' => '&gt;'
-            })
+            string.gsub(ESCAPE_PATTERN, ESCAPE_MAP)
           end
 
-          # Building two span Hashes:
-          #  * start_spans, with the starting positions as keys, and spans as values
-          #  * end_spans, with the ending positions as keys, and spans as values
           def prepare_spans
-            unless defined?(@prepared_spans)
-              start_spans = Hash.new{|h,k| h[k] = [] }
-              end_spans = Hash.new{|h,k| h[k] = [] }
-              spans.each {|span|
-                start_spans[span.start] << span
-                end_spans[span.end] << span
-              }
-              # Make sure the spans are sorted bigger first to respect the hierarchy
-              @start_spans = start_spans.each { |_, spans| spans.sort! { |a, b| b.end - b.start <=> a.end - a.start } }
-              @end_spans = end_spans
+            return [@start_spans, @end_spans] if @prepared_spans
+
+            start_spans = Hash.new { |h, k| h[k] = [] }
+            end_spans = Hash.new { |h, k| h[k] = [] }
+            spans.each do |span|
+              start_spans[span.start] << span
+              end_spans[span.end] << span
             end
+            start_spans.each_value { |s| s.sort! { |a, b| (b.end - b.start) <=> (a.end - a.start) } }
+
+            @start_spans = start_spans
+            @end_spans = end_spans
+            @prepared_spans = true
             [@start_spans, @end_spans]
           end
 
-          # Zero-formatted textual value of the block.
-          #
-          # @return The textual value.
           def as_text
             @text
           end
 
           def serialize(elt, text, link_resolver, html_serializer)
             custom_html = html_serializer && html_serializer.serialize(elt, text)
-            if custom_html.nil?
-              elt.serialize(text, link_resolver)
-            else
-              custom_html
-            end
+            custom_html.nil? ? elt.serialize(text, link_resolver) : custom_html
           end
 
           private :class_code, :cgi_escape_html
+
+          private
+
+          def boundary_positions
+            positions = [0, text.length]
+            spans.each do |span|
+              positions << span.start
+              positions << span.end
+            end
+            positions.uniq!
+            positions.sort!
+            positions
+          end
         end
 
         class Heading < Text
@@ -271,7 +244,7 @@ module Prismic
             @level = level
           end
 
-          def as_html(link_resolver=nil, html_serializer=nil)
+          def as_html(link_resolver = nil, html_serializer = nil)
             custom_html = html_serializer && html_serializer.serialize(self, super)
             if custom_html.nil?
               %(<h#{level}#{class_code}>#{super}</h#{level}>)
@@ -282,7 +255,7 @@ module Prismic
         end
 
         class Paragraph < Text
-          def as_html(link_resolver=nil, html_serializer=nil)
+          def as_html(link_resolver = nil, html_serializer = nil)
             custom_html = html_serializer && html_serializer.serialize(self, super)
             if custom_html.nil?
               %(<p#{class_code}>#{super}</p>)
@@ -293,7 +266,7 @@ module Prismic
         end
 
         class Preformatted < Text
-          def as_html(link_resolver=nil, html_serializer=nil)
+          def as_html(link_resolver = nil, html_serializer = nil)
             custom_html = html_serializer && html_serializer.serialize(self, super)
             if custom_html.nil?
               %(<pre#{class_code}>#{super}</pre>)
@@ -305,14 +278,14 @@ module Prismic
 
         class ListItem < Text
           attr_accessor :ordered
-          alias :ordered? :ordered
+          alias ordered? ordered
 
           def initialize(text, spans, ordered, label = nil)
             super(text, spans, label)
             @ordered = ordered
           end
 
-          def as_html(link_resolver, html_serializer=nil)
+          def as_html(link_resolver, html_serializer = nil)
             custom_html = html_serializer && html_serializer.serialize(self, super)
             if custom_html.nil?
               %(<li#{class_code}>#{super}</li>)
@@ -355,18 +328,13 @@ module Prismic
           end
 
           def as_html(link_resolver, html_serializer = nil)
-            custom = nil
-            unless html_serializer.nil?
-              custom = html_serializer.serialize(self, '')
-            end
-            if custom.nil?
-              classes = ['block-img']
-              unless @label.nil?
-                classes.push(@label)
-              end
-              %(<p class="#{classes.join(' ')}">#{view.as_html(link_resolver)}</p>)
+            custom = html_serializer && html_serializer.serialize(self, '')
+            return custom unless custom.nil?
+
+            if @label.nil?
+              %(<p class="block-img">#{view.as_html(link_resolver)}</p>)
             else
-              custom
+              %(<p class="block-img #{@label}">#{view.as_html(link_resolver)}</p>)
             end
           end
         end
@@ -396,19 +364,10 @@ module Prismic
           end
 
           def as_html(link_resolver, html_serializer = nil)
-            custom = nil
-            unless html_serializer.nil?
-              custom = html_serializer.serialize(self, '')
-            end
-            if custom.nil?
-              embed.as_html(link_resolver)
-            else
-              custom
-            end
+            custom = html_serializer && html_serializer.serialize(self, '')
+            custom.nil? ? embed.as_html(link_resolver) : custom
           end
-
         end
-
       end
     end
   end

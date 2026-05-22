@@ -27,7 +27,7 @@ module Prismic
     def set(key, value, expired_in = nil)
       @intern.delete(key)
       @intern[key] = { data: value, expired_in: expired_in && Time.now.getutc.to_i + expired_in }
-      @intern.delete(@intern.keys.first) while @intern.size > @max_size
+      @intern.shift while @intern.size > @max_size
       value
     end
 
