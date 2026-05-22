@@ -1,7 +1,3 @@
-# encoding: utf-8
-
-require 'hashery'
-
 module Prismic
   # This is a simple cache class provided with the prismic.io Ruby kit.
   #
@@ -14,13 +10,12 @@ module Prismic
   # you can create your API object like this: `Prismic.api(url, cache:
   # Prismic::DefaultCache)`
   class LruCache
-
-    # @return [LRUHash<String,Object>]
     attr_reader :intern
 
     # @param max_size [Fixnum] (100) The default maximum of keys to store
-    def initialize(max_size=100)
-      @intern = Hashery::LRUHash.new(max_size)
+    def initialize(max_size = 100)
+      @max_size = max_size
+      @intern = {}
     end
 
     # Add a cache entry.
@@ -30,7 +25,9 @@ module Prismic
     #
     # @return [Object] The stored value
     def set(key, value, expired_in = nil)
-      @intern.store(key, { :data => value, :expired_in => expired_in = expired_in && Time.now.getutc.to_i + expired_in })
+      @intern.delete(key)
+      @intern[key] = { data: value, expired_in: expired_in && Time.now.getutc.to_i + expired_in }
+      @intern.delete(@intern.keys.first) while @intern.size > @max_size
       value
     end
 
@@ -45,16 +42,18 @@ module Prismic
     # @return [Object] The cache object as was stored
     def get(key)
       return delete(key) if expired?(key)
-      include?(key) ? @intern[key][:data] : nil
+      return nil unless include?(key)
+
+      entry = @intern.delete(key)
+      @intern[key] = entry
+      entry[:data]
     end
-    alias :[] :get
+    alias [] get
 
     def get_or_set(key, value = nil, expired_in = nil)
-      if include?(key) && !expired?(key)
-        return get(key)
-      else
-        set(key, block_given? ? yield : value, expired_in)
-      end
+      return get(key) if include?(key) && !expired?(key)
+
+      set(key, block_given? ? yield : value, expired_in)
     end
 
     def delete(key)
@@ -70,10 +69,10 @@ module Prismic
     def has_key?(key)
       @intern.has_key?(key)
     end
-    alias :include? :has_key?
+    alias include? has_key?
 
     def expired?(key)
-      if include?(key) && @intern[key][:expired_in] != nil
+      if include?(key) && !@intern[key][:expired_in].nil?
         expired_in = @intern[key][:expired_in]
         expired_in && expired_in < Time.now.getutc.to_i
       else
@@ -85,7 +84,7 @@ module Prismic
     def invalidate_all!
       @intern.clear
     end
-    alias :clear! :invalidate_all!
+    alias clear! invalidate_all!
 
     # Expose the Hash keys
     #
@@ -102,20 +101,17 @@ module Prismic
     def size
       @intern.size
     end
-    alias :length :size
-
+    alias length size
   end
 
   # Available as an api cache for testing purposes (no caching)
   class BasicNullCache
-    def get(key)
-    end
+    def get(key); end
 
-    def set(key, value = nil, expired_in = nil)
+    def set(_key, value = nil, _expired_in = nil)
       block_given? ? yield : value
     end
-    alias_method :get_or_set, :set
-
+    alias get_or_set set
   end
 
   # This default instance is used by the API to avoid creating a new instance
