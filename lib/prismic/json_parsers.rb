@@ -133,21 +133,21 @@ module Prismic
         Prismic::Fragments::Color.new(json['value'][1..6])
       end
 
-      def structured_text_parser(json)
-        def self.span_parser(span)
-          case span['type']
-          when 'em'
-            Prismic::Fragments::StructuredText::Span::Em.new(span['start'], span['end'])
-          when 'strong'
-            Prismic::Fragments::StructuredText::Span::Strong.new(span['start'], span['end'])
-          when 'hyperlink'
-            Prismic::Fragments::StructuredText::Span::Hyperlink.new(span['start'], span['end'], link_parser(span['data']))
-          else
-            label = span['data'] && span['data']['label']
-            Prismic::Fragments::StructuredText::Span::Label.new(span['start'], span['end'], label)
-          end
+      def span_parser(span)
+        case span['type']
+        when 'em'
+          Prismic::Fragments::StructuredText::Span::Em.new(span['start'], span['end'])
+        when 'strong'
+          Prismic::Fragments::StructuredText::Span::Strong.new(span['start'], span['end'])
+        when 'hyperlink'
+          Prismic::Fragments::StructuredText::Span::Hyperlink.new(span['start'], span['end'], link_parser(span['data']))
+        else
+          label = span['data'] && span['data']['label']
+          Prismic::Fragments::StructuredText::Span::Label.new(span['start'], span['end'], label)
         end
+      end
 
+      def structured_text_parser(json)
         blocks = json['value'].map do |block|
           case block['type']
           when 'paragraph'
