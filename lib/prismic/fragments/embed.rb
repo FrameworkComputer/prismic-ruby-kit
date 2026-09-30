@@ -19,7 +19,7 @@ module Prismic
       #
       # @return [String] the HTML representation
       def as_html(link_resolver=nil, html_serializer=nil)
-        %Q|<div data-oembed="#{@url}" data-oembed-type="#{@embed_type.downcase}" data-oembed-provider="#{@provider.downcase}">#@html</div>|
+        %Q|<div data-oembed="#{CGI::escapeHTML(@url.to_s)}" data-oembed-type="#{CGI::escapeHTML(@embed_type.downcase)}" data-oembed-provider="#{CGI::escapeHTML(@provider.downcase)}">#@html</div>|
       end
     end
   end

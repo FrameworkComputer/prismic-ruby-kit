@@ -5,9 +5,9 @@ module Prismic
 
       def start_html(link_resolver = nil, target = nil)
         unless target.nil?
-          %(<a href="#{url(link_resolver)}" target="#{target}" rel="noopener">)
+          %(<a href="#{CGI::escapeHTML(url(link_resolver).to_s)}" target="#{CGI::escapeHTML(target)}" rel="noopener">)
         else 
-          %(<a href="#{url(link_resolver)}">)
+          %(<a href="#{CGI::escapeHTML(url(link_resolver).to_s)}">)
         end
       end
 
@@ -16,7 +16,7 @@ module Prismic
       end
 
       def as_html(link_resolver=nil)
-        %(#{start_html(link_resolver, @target)}#{url(link_resolver)}#{end_html})
+        %(#{start_html(link_resolver, @target)}#{CGI::escapeHTML(url(link_resolver).to_s)}#{end_html})
       end
 
       # Returns the URL of the link
@@ -67,7 +67,7 @@ module Prismic
       end
 
       def as_html(link_resolver=nil)
-        %(#{start_html(link_resolver)}#@name#{end_html})
+        %(#{start_html(link_resolver)}#{CGI::escapeHTML(@name.to_s)}#{end_html})
       end
 
       # Returns the URL of the link
@@ -130,7 +130,7 @@ module Prismic
       end
 
       def as_html(link_resolver=nil)
-        %(#{start_html(link_resolver)}#{slug}#{end_html})
+        %(#{start_html(link_resolver)}#{CGI::escapeHTML(slug.to_s)}#{end_html})
       end
 
       def link_type

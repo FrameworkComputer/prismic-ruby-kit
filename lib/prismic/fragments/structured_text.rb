@@ -112,9 +112,9 @@ module Prismic
             if link.is_a? Prismic::Fragments::DocumentLink and link.broken
               "<span>#{text}</span>"
             elsif !link.target.nil?
-              %(<a href="#{link.url(link_resolver)}" target="#{link.target}" rel="noopener">#{text}</a>)
+              %(<a href="#{CGI::escapeHTML(link.url(link_resolver).to_s)}" target="#{CGI::escapeHTML(link.target)}" rel="noopener">#{text}</a>)
             else
-              %(<a href="#{link.url(link_resolver)}">#{text}</a>)
+              %(<a href="#{CGI::escapeHTML(link.url(link_resolver).to_s)}">#{text}</a>)
             end
           end
         end
