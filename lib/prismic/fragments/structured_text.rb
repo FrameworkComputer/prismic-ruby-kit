@@ -1,3 +1,5 @@
+require 'cgi/escape'
+
 module Prismic
   module Fragments
     class StructuredText < Fragment
@@ -126,15 +128,6 @@ module Prismic
         end
 
         class Text
-          ESCAPE_MAP = {
-            "'" => '&#39;',
-            '&' => '&amp;',
-            '"' => '&quot;',
-            '<' => '&lt;',
-            '>' => '&gt;'
-          }.freeze
-          ESCAPE_PATTERN = /['&"<>]/.freeze
-
           attr_accessor :text, :spans, :label
 
           def initialize(text, spans, label = nil)
@@ -191,7 +184,7 @@ module Prismic
           end
 
           def cgi_escape_html(string)
-            string.gsub(ESCAPE_PATTERN, ESCAPE_MAP)
+            CGI.escapeHTML(string)
           end
 
           def prepare_spans
