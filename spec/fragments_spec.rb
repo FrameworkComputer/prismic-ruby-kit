@@ -649,6 +649,31 @@ describe 'StructuredText::Preformatted' do
   end
 end
 
+describe 'StructuredText html_serializer' do
+  let :text do Prismic::Fragments::StructuredText::Block::Paragraph.new('This is a simple test.', [em(5, 7), strong(8, 9)]) end
+  let :structured_text do Prismic::Fragments::StructuredText.new([text]) end
+
+  it 'renders the same HTML as without a serializer when the serializer returns nil' do
+    serializer = Prismic.html_serializer { |_element, _content| nil }
+    structured_text.as_html(nil, serializer).should == structured_text.as_html(nil)
+  end
+
+  it 'invokes the serializer exactly once per element' do
+    seen = []
+    serializer = Prismic.html_serializer { |element, _content| seen << element; nil }
+    structured_text.as_html(nil, serializer)
+    seen.size.should == 3          # 1 paragraph + 2 spans
+    seen.uniq.size.should == 3
+  end
+
+  it 'uses the serializer output for the block and keeps default span rendering' do
+    serializer = Prismic.html_serializer { |element, content|
+      element.is_a?(Prismic::Fragments::StructuredText::Block::Paragraph) ? "<div>#{content}</div>" : nil
+    }
+    structured_text.as_html(nil, serializer).should == '<div>This <em>is</em> <strong>a</strong> simple test.</div>'
+  end
+end
+
 describe 'StructuredText::Image' do
   before do
     @view = Prismic::Fragments::Image::View.new('my_url', 10, 10, "Aternative", "CC-BY", nil)

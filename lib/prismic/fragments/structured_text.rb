@@ -238,34 +238,25 @@ module Prismic
           end
 
           def as_html(link_resolver = nil, html_serializer = nil)
-            custom_html = html_serializer && html_serializer.serialize(self, super)
-            if custom_html.nil?
-              %(<h#{level}#{class_code}>#{super}</h#{level}>)
-            else
-              custom_html
-            end
+            inner = super
+            custom_html = html_serializer && html_serializer.serialize(self, inner)
+            custom_html.nil? ? %(<h#{level}#{class_code}>#{inner}</h#{level}>) : custom_html
           end
         end
 
         class Paragraph < Text
           def as_html(link_resolver = nil, html_serializer = nil)
-            custom_html = html_serializer && html_serializer.serialize(self, super)
-            if custom_html.nil?
-              %(<p#{class_code}>#{super}</p>)
-            else
-              custom_html
-            end
+            inner = super
+            custom_html = html_serializer && html_serializer.serialize(self, inner)
+            custom_html.nil? ? %(<p#{class_code}>#{inner}</p>) : custom_html
           end
         end
 
         class Preformatted < Text
           def as_html(link_resolver = nil, html_serializer = nil)
-            custom_html = html_serializer && html_serializer.serialize(self, super)
-            if custom_html.nil?
-              %(<pre#{class_code}>#{super}</pre>)
-            else
-              custom_html
-            end
+            inner = super
+            custom_html = html_serializer && html_serializer.serialize(self, inner)
+            custom_html.nil? ? %(<pre#{class_code}>#{inner}</pre>) : custom_html
           end
         end
 
@@ -279,12 +270,9 @@ module Prismic
           end
 
           def as_html(link_resolver, html_serializer = nil)
-            custom_html = html_serializer && html_serializer.serialize(self, super)
-            if custom_html.nil?
-              %(<li#{class_code}>#{super}</li>)
-            else
-              custom_html
-            end
+            inner = super
+            custom_html = html_serializer && html_serializer.serialize(self, inner)
+            custom_html.nil? ? %(<li#{class_code}>#{inner}</li>) : custom_html
           end
         end
 
