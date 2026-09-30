@@ -1,3 +1,5 @@
+require 'cgi/escape'
+
 module Prismic
   module Fragments
     class StructuredText < Fragment
@@ -112,9 +114,9 @@ module Prismic
             if link.is_a? Prismic::Fragments::DocumentLink and link.broken
               "<span>#{text}</span>"
             elsif !link.target.nil?
-              %(<a href="#{link.url(link_resolver)}" target="#{link.target}" rel="noopener">#{text}</a>)
+              %(<a href="#{CGI::escapeHTML(link.url(link_resolver).to_s)}" target="#{CGI::escapeHTML(link.target)}" rel="noopener">#{text}</a>)
             else
-              %(<a href="#{link.url(link_resolver)}">#{text}</a>)
+              %(<a href="#{CGI::escapeHTML(link.url(link_resolver).to_s)}">#{text}</a>)
             end
           end
         end
@@ -126,15 +128,6 @@ module Prismic
         end
 
         class Text
-          ESCAPE_MAP = {
-            "'" => '&#39;',
-            '&' => '&amp;',
-            '"' => '&quot;',
-            '<' => '&lt;',
-            '>' => '&gt;'
-          }.freeze
-          ESCAPE_PATTERN = /['&"<>]/.freeze
-
           attr_accessor :text, :spans, :label
 
           def initialize(text, spans, label = nil)
@@ -191,7 +184,7 @@ module Prismic
           end
 
           def cgi_escape_html(string)
-            string.gsub(ESCAPE_PATTERN, ESCAPE_MAP)
+            CGI.escapeHTML(string)
           end
 
           def prepare_spans
@@ -245,34 +238,25 @@ module Prismic
           end
 
           def as_html(link_resolver = nil, html_serializer = nil)
-            custom_html = html_serializer && html_serializer.serialize(self, super)
-            if custom_html.nil?
-              %(<h#{level}#{class_code}>#{super}</h#{level}>)
-            else
-              custom_html
-            end
+            inner = super
+            custom_html = html_serializer && html_serializer.serialize(self, inner)
+            custom_html.nil? ? %(<h#{level}#{class_code}>#{inner}</h#{level}>) : custom_html
           end
         end
 
         class Paragraph < Text
           def as_html(link_resolver = nil, html_serializer = nil)
-            custom_html = html_serializer && html_serializer.serialize(self, super)
-            if custom_html.nil?
-              %(<p#{class_code}>#{super}</p>)
-            else
-              custom_html
-            end
+            inner = super
+            custom_html = html_serializer && html_serializer.serialize(self, inner)
+            custom_html.nil? ? %(<p#{class_code}>#{inner}</p>) : custom_html
           end
         end
 
         class Preformatted < Text
           def as_html(link_resolver = nil, html_serializer = nil)
-            custom_html = html_serializer && html_serializer.serialize(self, super)
-            if custom_html.nil?
-              %(<pre#{class_code}>#{super}</pre>)
-            else
-              custom_html
-            end
+            inner = super
+            custom_html = html_serializer && html_serializer.serialize(self, inner)
+            custom_html.nil? ? %(<pre#{class_code}>#{inner}</pre>) : custom_html
           end
         end
 
@@ -286,12 +270,9 @@ module Prismic
           end
 
           def as_html(link_resolver, html_serializer = nil)
-            custom_html = html_serializer && html_serializer.serialize(self, super)
-            if custom_html.nil?
-              %(<li#{class_code}>#{super}</li>)
-            else
-              custom_html
-            end
+            inner = super
+            custom_html = html_serializer && html_serializer.serialize(self, inner)
+            custom_html.nil? ? %(<li#{class_code}>#{inner}</li>) : custom_html
           end
         end
 

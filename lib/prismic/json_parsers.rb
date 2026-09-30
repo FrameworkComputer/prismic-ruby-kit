@@ -1,6 +1,6 @@
 # encoding: utf-8
 
-require 'cgi'
+require 'cgi/escape'
 require 'time'
 
 module Prismic

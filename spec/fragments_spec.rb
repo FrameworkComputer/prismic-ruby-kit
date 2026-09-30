@@ -37,6 +37,11 @@ describe 'WebLink' do
     it "returns an <a> HTML element with an target blank attribute" do
       Nokogiri::XML(@target_blank.as_html).child.attribute('target').value.should == '_blank'
     end
+
+    it "escapes the url and the target" do
+      web_link = Prismic::Fragments::WebLink.new('https://example.com/?a="b"&c=<d>', '_blank"')
+      web_link.as_html.should == '<a href="https://example.com/?a=&quot;b&quot;&amp;c=&lt;d&gt;" target="_blank&quot;" rel="noopener">https://example.com/?a=&quot;b&quot;&amp;c=&lt;d&gt;</a>'
+    end
   end
 
   describe 'as_text' do
@@ -66,6 +71,19 @@ describe 'DocumentLink' do
     end
     it 'works in a unified way' do
       @document_link.url(@link_resolver).should == 'http://localhost/UdUjvt_mqVNObPeO'
+    end
+  end
+
+  describe 'as_html' do
+    it 'escapes the resolved url and the slug' do
+      document_link = Prismic::Fragments::DocumentLink.new("UdUjvt_mqVNObPeO", nil, "product", [], 'dark-"chocolate"', "en-us", {}, false)
+      link_resolver = Prismic.link_resolver("master"){|doc_link| "http://localhost/#{doc_link.id}?a=1&b=2" }
+      document_link.as_html(link_resolver).should == '<a href="http://localhost/UdUjvt_mqVNObPeO?a=1&amp;b=2">dark-&quot;chocolate&quot;</a>'
+    end
+
+    it 'renders an empty href when the link resolver returns nil' do
+      link_resolver = Prismic.link_resolver("master"){|doc_link| nil }
+      @document_link.as_html(link_resolver).should == '<a href="">dark-chocolate-macaron</a>'
     end
   end
 
@@ -128,6 +146,13 @@ describe 'FileLink' do
           "<p><a href=\"https://prismic-io.s3.amazonaws.com/annual.report.pdf\">2012 Annual Report</a></p>\n\n"\
           "<p><a href=\"https://prismic-io.s3.amazonaws.com/annual.budget.pdf\">2012 Annual Budget</a></p>\n\n"\
           "<p><a href=\"https://prismic-io.s3.amazonaws.com/vision.strategic.plan_.sm_.pdf\">2015 Vision &amp; Strategic Plan</a></p>"
+    end
+  end
+
+  describe 'as_html' do
+    it 'escapes the url and the name' do
+      file_link = Prismic::Fragments::FileLink.new('https://example.com/?a=1&b=2', 'Vision & "Plan".pdf', 'document', 1)
+      file_link.as_html.should == '<a href="https://example.com/?a=1&amp;b=2">Vision &amp; &quot;Plan&quot;.pdf</a>'
     end
   end
 end
@@ -421,6 +446,11 @@ describe 'Embed' do
     it "returns an element wrapping the `html` value" do
       Nokogiri::XML(@embed.as_html).child.content.should == 'my_html'
     end
+
+    it "escapes the url, the type and the provider but not the `html` value" do
+      embed = Prismic::Fragments::Embed.new('Vi"deo', 'You&Tube', 'https://example.com/?v=1&t="2"', '<iframe src="x"></iframe>', nil)
+      embed.as_html.should == '<div data-oembed="https://example.com/?v=1&amp;t=&quot;2&quot;" data-oembed-type="vi&quot;deo" data-oembed-provider="you&amp;tube"><iframe src="x"></iframe></div>'
+    end
   end
 
   describe 'as_text' do
@@ -465,6 +495,17 @@ describe 'Image::View' do
       @alt = "Alternative text"
       @view.alt = @alt
       Nokogiri::XML(@view.as_html).child.attribute('alt').value.should == @alt
+    end
+
+    it "escapes the url and the alt" do
+      @view.url = 'https://images.prismic.io/badge.png?auto=compress,format&rect=0,0,10,2'
+      @view.alt = 'Tag saying "updated" <new> & more'
+      @view.as_html.should == '<img src="https://images.prismic.io/badge.png?auto=compress,format&amp;rect=0,0,10,2" alt="Tag saying &quot;updated&quot; &lt;new&gt; &amp; more" width="10" height="2" />'
+    end
+
+    it "renders an empty alt when the alt is nil" do
+      @view.alt = nil
+      @view.as_html.should == '<img src="my_url" alt="" width="10" height="2" />'
     end
 
     # it "if not set, alt attribute is absent" do
@@ -608,6 +649,31 @@ describe 'StructuredText::Preformatted' do
   end
 end
 
+describe 'StructuredText html_serializer' do
+  let :text do Prismic::Fragments::StructuredText::Block::Paragraph.new('This is a simple test.', [em(5, 7), strong(8, 9)]) end
+  let :structured_text do Prismic::Fragments::StructuredText.new([text]) end
+
+  it 'renders the same HTML as without a serializer when the serializer returns nil' do
+    serializer = Prismic.html_serializer { |_element, _content| nil }
+    structured_text.as_html(nil, serializer).should == structured_text.as_html(nil)
+  end
+
+  it 'invokes the serializer exactly once per element' do
+    seen = []
+    serializer = Prismic.html_serializer { |element, _content| seen << element; nil }
+    structured_text.as_html(nil, serializer)
+    seen.size.should == 3          # 1 paragraph + 2 spans
+    seen.uniq.size.should == 3
+  end
+
+  it 'uses the serializer output for the block and keeps default span rendering' do
+    serializer = Prismic.html_serializer { |element, content|
+      element.is_a?(Prismic::Fragments::StructuredText::Block::Paragraph) ? "<div>#{content}</div>" : nil
+    }
+    structured_text.as_html(nil, serializer).should == '<div>This <em>is</em> <strong>a</strong> simple test.</div>'
+  end
+end
+
 describe 'StructuredText::Image' do
   before do
     @view = Prismic::Fragments::Image::View.new('my_url', 10, 10, "Aternative", "CC-BY", nil)
@@ -676,6 +742,11 @@ describe 'StructuredText::Hyperlink' do
     end
     it "can generate valid html for target blank" do
       @target_hyperlink.serialize('', @link_resolver).should == '<a href="link_url" target="_blank" rel="noopener"></a>'
+    end
+    it "escapes the url and the target but not the already escaped text" do
+      web_link = Prismic::Fragments::WebLink.new('https://example.com/?a="b"&c=d', '_blank"')
+      hyperlink = Prismic::Fragments::StructuredText::Span::Hyperlink.new(0, 0, web_link)
+      hyperlink.serialize('Q&amp;A', @link_resolver).should == '<a href="https://example.com/?a=&quot;b&quot;&amp;c=d" target="_blank&quot;" rel="noopener">Q&amp;A</a>'
     end
   end
 end
