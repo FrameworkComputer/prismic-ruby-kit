@@ -140,7 +140,8 @@ module Prismic
   #   results = search_form.submit(master_ref)  # submit the search form
   #   results = api.form('everything').page(3).page_size("20").submit(master_ref) # methods can be chained
   class SearchForm
-    attr_accessor :api, :form, :data, :ref
+    attr_accessor :api, :form, :data
+    attr_writer :ref
 
     def initialize(api, form, data={}, ref=nil)
       @api = api
@@ -160,15 +161,6 @@ module Prismic
     end
 
     def q(*query)
-      def serialize(field)
-        if field.kind_of?(String) and not (field.start_with?('my.') or field.start_with?('document'))
-          %("#{field}")
-        elsif field.kind_of?(Array)
-          %([#{field.map{ |arg| serialize(arg) }.join(', ')}])
-        else
-          %(#{field})
-        end
-      end
       if query[0].kind_of?(String)
         set('q', query[0])
       else
@@ -179,12 +171,23 @@ module Prismic
           predicate.map { |q|
             op = q[0]
             rest = q[1..-1]
-            "[:d = #{op}(#{rest.map { |arg| serialize(arg) }.join(', ')})]"
+            "[:d = #{op}(#{rest.map { |arg| serialize_predicate_value(arg) }.join(', ')})]"
           }.join('')
         }
         set('q', "[#{predicates * ''}]")
       end
     end
+
+    def serialize_predicate_value(field)
+      if field.kind_of?(String) and not (field.start_with?('my.') or field.start_with?('document'))
+        %("#{field}")
+      elsif field.kind_of?(Array)
+        %([#{field.map{ |arg| serialize_predicate_value(arg) }.join(', ')}])
+      else
+        %(#{field})
+      end
+    end
+    private :serialize_predicate_value
 
     # @!method orderings(orderings)
     #   Specify a orderings for this form.

@@ -31,7 +31,8 @@ module Prismic
     end
 
     class WebLink < Link
-      attr_accessor :url, :target
+      attr_accessor :target
+      attr_writer :url
 
       def initialize(url, target = nil)
         @url = url
@@ -56,7 +57,8 @@ module Prismic
     end
 
     class FileLink < Link
-      attr_accessor :url, :name, :kind, :size, :target
+      attr_accessor :name, :kind, :size, :target
+      attr_writer :url
 
       def initialize(url, name, kind, size, target = nil)
         @url = url
@@ -85,7 +87,8 @@ module Prismic
     end
 
     class ImageLink < Link
-      attr_accessor :url, :target
+      attr_accessor :target
+      attr_writer :url
 
       def initialize(url, target = nil)
         @url = url
