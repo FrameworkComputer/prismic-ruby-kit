@@ -1,7 +1,6 @@
 ## Ruby development kit for prismic.io
 
 [![Gem Version](https://badge.fury.io/rb/prismic.io.png)](http://badge.fury.io/rb/prismic.io)
-[![Build Status](https://travis-ci.com/prismicio-community/ruby-kit.svg?branch=master)](https://travis-ci.com/prismicio-community/ruby-kit)
 
 ### Getting Started
 
@@ -58,8 +57,6 @@ Please write tests for any bugfix or new feature, by placing your tests in the [
 If you find existing code that is not optimally tested and wish to make it better, we really appreciate it; but you should document it on its own branch and its own pull request.
 
 #### Documentation
-
-Please document any bugfix or new feature, using the [Yard](http://yardoc.org/) syntax. Don't worry about generating the doc, we'll take care of that.
 
 If you find existing code that is not optimally documented and wish to make it better, we really appreciate it; but you should document it on its own branch and its own pull request.
 
