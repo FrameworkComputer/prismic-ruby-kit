@@ -9,7 +9,7 @@ module Prismic
       end
 
       def as_html(link_resolver=nil)
-        %(<span class="text">#{CGI::escapeHTML(@value)}</span>)
+        %(<span class="text">#{CGI::escapeHTML(@value.to_s)}</span>)
       end
 
       def as_text

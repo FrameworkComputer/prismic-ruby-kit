@@ -219,6 +219,10 @@ describe 'Text' do
       @text = Prismic::Fragments::Text.new('&my <value> #abcde')
       @text.as_html.should =~ /^<[^>]+>&amp;my &lt;value&gt; #abcde<[^>]+>$/
     end
+
+    it "renders an empty span for a nil value" do
+      Prismic::Fragments::Text.new(nil).as_html.should == '<span class="text"></span>'
+    end
   end
 
   describe 'as_text' do
@@ -450,6 +454,11 @@ describe 'Embed' do
     it "escapes the url, the type and the provider but not the `html` value" do
       embed = Prismic::Fragments::Embed.new('Vi"deo', 'You&Tube', 'https://example.com/?v=1&t="2"', '<iframe src="x"></iframe>', nil)
       embed.as_html.should == '<div data-oembed="https://example.com/?v=1&amp;t=&quot;2&quot;" data-oembed-type="vi&quot;deo" data-oembed-provider="you&amp;tube"><iframe src="x"></iframe></div>'
+    end
+
+    it "renders without a provider name" do
+      embed = Prismic::Fragments::Embed.new('video', nil, 'my_url', 'my_html', nil)
+      embed.as_html.should == '<div data-oembed="my_url" data-oembed-type="video" data-oembed-provider="">my_html</div>'
     end
   end
 
