@@ -1,7 +1,7 @@
 # encoding: utf-8
 require 'spec_helper'
 
-describe Prismic::API do
+describe Prismic::API, live: true do
   before do
     @api = Prismic.api('https://micro.prismic.io/api', nil)
   end

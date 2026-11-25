@@ -12,12 +12,10 @@ Gem::Specification.new do |spec|
   spec.homepage      = 'http://prismic.io'
   spec.license       = 'Apache-2.0'
 
-  spec.files         = `git ls-files`.split($/)
-  spec.executables   = spec.files.grep(%r{^bin/}) { |f| File.basename(f) }
-  spec.test_files    = spec.files.grep(%r{^(test|spec|features)/})
+  spec.files         = Dir['lib/**/*.rb'] + %w[LICENSE.md README.md]
   spec.require_paths = ['lib']
+  spec.required_ruby_version = '>= 3.4'
 
   spec.add_development_dependency 'nokogiri'
   spec.add_development_dependency 'rspec'
-  spec.add_development_dependency 'rspec-core'
 end

@@ -1,7 +1,6 @@
 ## Ruby development kit for prismic.io
 
 [![Gem Version](https://badge.fury.io/rb/prismic.io.png)](http://badge.fury.io/rb/prismic.io)
-[![Build Status](https://travis-ci.com/prismicio-community/ruby-kit.svg?branch=master)](https://travis-ci.com/prismicio-community/ruby-kit)
 
 ### Getting Started
 
@@ -53,13 +52,11 @@ Clone the kit, then run `bundle install`.
 
 #### Test
 
-Please write tests for any bugfix or new feature, by placing your tests in the [spec/](spec/) folder, following the [RSpec](http://rspec.info/) syntax. Launch the tests by running `rspec`
+Please write tests for any bugfix or new feature, by placing your tests in the [spec/](spec/) folder, following the [RSpec](http://rspec.info/) syntax. Run `bundle exec rspec` for the offline suite, and `LIVE=1 bundle exec rspec` to include the examples that call `micro.prismic.io`.
 
 If you find existing code that is not optimally tested and wish to make it better, we really appreciate it; but you should document it on its own branch and its own pull request.
 
 #### Documentation
-
-Please document any bugfix or new feature, using the [Yard](http://yardoc.org/) syntax. Don't worry about generating the doc, we'll take care of that.
 
 If you find existing code that is not optimally documented and wish to make it better, we really appreciate it; but you should document it on its own branch and its own pull request.
 

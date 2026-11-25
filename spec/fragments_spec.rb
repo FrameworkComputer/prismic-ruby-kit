@@ -219,6 +219,10 @@ describe 'Text' do
       @text = Prismic::Fragments::Text.new('&my <value> #abcde')
       @text.as_html.should =~ /^<[^>]+>&amp;my &lt;value&gt; #abcde<[^>]+>$/
     end
+
+    it "renders an empty span for a nil value" do
+      Prismic::Fragments::Text.new(nil).as_html.should == '<span class="text"></span>'
+    end
   end
 
   describe 'as_text' do
@@ -451,6 +455,11 @@ describe 'Embed' do
       embed = Prismic::Fragments::Embed.new('Vi"deo', 'You&Tube', 'https://example.com/?v=1&t="2"', '<iframe src="x"></iframe>', nil)
       embed.as_html.should == '<div data-oembed="https://example.com/?v=1&amp;t=&quot;2&quot;" data-oembed-type="vi&quot;deo" data-oembed-provider="you&amp;tube"><iframe src="x"></iframe></div>'
     end
+
+    it "renders without a provider name" do
+      embed = Prismic::Fragments::Embed.new('video', nil, 'my_url', 'my_html', nil)
+      embed.as_html.should == '<div data-oembed="my_url" data-oembed-type="video" data-oembed-provider="">my_html</div>'
+    end
   end
 
   describe 'as_text' do
@@ -594,6 +603,10 @@ describe 'StructuredText::Heading' do
     @heading = 2
     block.as_html(nil).should == '<h2>This <em>is</em> <strong>a</strong> simple test.</h2>'
   end
+  it 'ignores a span past the end of the parsed heading' do
+    json = JSON.load(File.read("#{File.dirname(__FILE__)}/responses_mocks/structured_text_heading.json"))
+    Prismic::JsonParser.structured_text_parser(json).as_html(nil).should == '<h1>Salted Caramel Macaron</h1>'
+  end
 end
 
 describe 'StructuredText::Paragraph' do
@@ -637,6 +650,50 @@ describe 'StructuredText::Paragraph' do
     @text  = 'abcdefghijklmnopqrstuvwxyz'
     @spans = [em(2, 4), strong(4, 6)]
     block.as_html(nil).should =~ %r{^<[^>]+>ab<em>cd</em><strong>ef</strong>ghijklmnopqrstuvwxyz<[^>]+>$}
+  end
+  it 'ignores a span that starts past the end of the text' do
+    @text  = 'abc'
+    @spans = [em(5, 10)]
+    block.as_html(nil).should == '<p>abc</p>'
+  end
+  it 'renders spans that end at different positions past the text' do
+    @text  = 'abc'
+    @spans = [strong(1, 5), em(1, 10)]
+    block.as_html(nil).should == '<p>a<em><strong>bc</strong></em></p>'
+  end
+  it 'keeps an empty span that starts at the end of the text' do
+    @text  = 'abc'
+    @spans = [strong(3, 10)]
+    block.as_html(nil).should == '<p>abc<strong></strong></p>'
+  end
+  it 'splits a span that overlaps the one ending before it' do
+    @text  = 'abcdef'
+    @spans = [em(0, 4), strong(2, 6)]
+    block.as_html(nil).should == '<p><em>ab<strong>cd</strong></em><strong>ef</strong></p>'
+  end
+  it 'does not emit an empty continuation' do
+    @text  = 'abc'
+    @spans = [em(0, 3), strong(1, 10)]
+    block.as_html(nil).should == '<p><em>a<strong>bc</strong></em></p>'
+  end
+  it 'calls the serializer once per piece of a split span' do
+    @text  = 'abcdef'
+    @spans = [em(0, 4), strong(2, 6)]
+    seen = []
+    serializer = Prismic.html_serializer { |element, _content| seen << element; nil }
+    block.as_html(nil, serializer)
+    seen.size.should == 4
+  end
+  it 'can be Marshal-dumped after rendering' do
+    @text  = "This is a simple test."
+    @spans = [em(5, 7), strong(8, 9)]
+    html = block.as_html(nil)
+    Marshal.load(Marshal.dump(block)).as_html(nil).should == html
+  end
+  it 'renders a block without spans' do
+    @text  = "a < b & c\nd"
+    @spans = []
+    block.as_html(nil).should == '<p>a &lt; b &amp; c<br>d</p>'
   end
 end
 
@@ -766,7 +823,7 @@ describe 'Multiple' do
   end
 end
 
-describe 'Group' do
+describe 'Group', live: true do
   before do
     @micro_api = Prismic.api('https://micro.prismic.io/api', nil)
     @master_ref = @micro_api.master_ref

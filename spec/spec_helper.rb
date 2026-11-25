@@ -1,15 +1,10 @@
 # encoding: utf-8
 require 'nokogiri'
-begin
-  require 'yajl/json_gem'
-rescue LoadError
-  # ok not a big deal
-  require 'json'
-end
 
 RSpec.configure do |c|
   # Stop after the first failure
   # c.fail_fast = true
+  c.filter_run_excluding live: true unless ENV['LIVE']
 end
 
 $LOAD_PATH << File.join(File.dirname(__FILE__), '..', 'lib')

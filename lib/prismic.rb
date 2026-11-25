@@ -13,6 +13,8 @@ module Prismic
 
   PREVIEW_COOKIE = 'io.prismic.preview'
 
+  URL_PATTERN = /\A#{URI::RFC2396_PARSER.make_regexp(%w[http https])}\z/
+
   # These exception can contains an error cause and is able to show them
   class Error < Exception
     attr_reader :cause
@@ -63,9 +65,7 @@ module Prismic
   #
   # @return [API] The API instance related to this repository
   def self.api(url, opts=nil)
-    if (not url =~ /\A#{URI::regexp(['http', 'https'])}\z/)
-      raise ArgumentError.new("Valid web URI expected")
-    end
+    raise ArgumentError, 'Valid web URI expected' unless URL_PATTERN.match?(url.to_s)
     opts ||= {}
     opts = {access_token: opts} if opts.is_a?(String)
     API.start(url, opts)
@@ -140,7 +140,8 @@ module Prismic
   #   results = search_form.submit(master_ref)  # submit the search form
   #   results = api.form('everything').page(3).page_size("20").submit(master_ref) # methods can be chained
   class SearchForm
-    attr_accessor :api, :form, :data, :ref
+    attr_accessor :api, :form, :data
+    attr_writer :ref
 
     def initialize(api, form, data={}, ref=nil)
       @api = api
@@ -160,15 +161,6 @@ module Prismic
     end
 
     def q(*query)
-      def serialize(field)
-        if field.kind_of?(String) and not (field.start_with?('my.') or field.start_with?('document'))
-          %("#{field}")
-        elsif field.kind_of?(Array)
-          %([#{field.map{ |arg| serialize(arg) }.join(', ')}])
-        else
-          %(#{field})
-        end
-      end
       if query[0].kind_of?(String)
         set('q', query[0])
       else
@@ -179,12 +171,23 @@ module Prismic
           predicate.map { |q|
             op = q[0]
             rest = q[1..-1]
-            "[:d = #{op}(#{rest.map { |arg| serialize(arg) }.join(', ')})]"
+            "[:d = #{op}(#{rest.map { |arg| serialize_predicate_value(arg) }.join(', ')})]"
           }.join('')
         }
         set('q', "[#{predicates * ''}]")
       end
     end
+
+    def serialize_predicate_value(field)
+      if field.kind_of?(String) and not (field.start_with?('my.') or field.start_with?('document'))
+        %("#{field}")
+      elsif field.kind_of?(Array)
+        %([#{field.map{ |arg| serialize_predicate_value(arg) }.join(', ')}])
+      else
+        %(#{field})
+      end
+    end
+    private :serialize_predicate_value
 
     # @!method orderings(orderings)
     #   Specify a orderings for this form.
@@ -621,7 +624,7 @@ module Prismic
       # - code: returns the response's HTTP status code (as number or String)
       # - body: returns the response's body (as String)
       def get(uri, data={}, headers={})
-        uri = URI(uri) if uri.is_a?(String)
+        uri = uri.is_a?(String) ? URI(uri) : uri.dup
         add_query(uri, data)
         http = Net::HTTP.new(uri.host, uri.port)
         http.use_ssl = uri.scheme =~ /https/i
@@ -634,7 +637,7 @@ module Prismic
       # - code: returns the response's HTTP status code (as number or String)
       # - body: returns the response's body (as String)
       def post(uri, data={}, headers={})
-        uri = URI(uri) if uri.is_a?(String)
+        uri = uri.is_a?(String) ? URI(uri) : uri.dup
         add_query(uri, data)
         http = Net::HTTP.new(uri.host, uri.port)
         http.use_ssl = uri.scheme =~ /https/i

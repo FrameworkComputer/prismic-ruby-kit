@@ -1,7 +1,7 @@
 # encoding: utf-8
 require 'spec_helper'
 
-describe "Cache's" do
+describe "Cache's", live: true do
 
   describe 'on/off switch' do
     before do

@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    prismic.io (1.10.0)
+    prismic.io (1.11.0)
 
 GEM
   remote: https://rubygems.org/
@@ -11,14 +11,11 @@ GEM
     nokogiri (1.19.4)
       mini_portile2 (~> 2.8.2)
       racc (~> 1.4)
-    nokogiri (1.19.4-java)
-      racc (~> 1.4)
-    nokogiri (1.19.4-x86_64-darwin)
+    nokogiri (1.19.4-arm64-darwin)
       racc (~> 1.4)
     nokogiri (1.19.4-x86_64-linux-gnu)
       racc (~> 1.4)
     racc (1.8.1)
-    racc (1.8.1-java)
     rspec (3.13.2)
       rspec-core (~> 3.13.0)
       rspec-expectations (~> 3.13.0)
@@ -34,16 +31,14 @@ GEM
     rspec-support (3.13.7)
 
 PLATFORMS
-  java
+  arm64-darwin
   ruby
-  x86_64-darwin-19
   x86_64-linux
 
 DEPENDENCIES
   nokogiri
   prismic.io!
   rspec
-  rspec-core
 
 BUNDLED WITH
-  4.0.12
+  4.1.1

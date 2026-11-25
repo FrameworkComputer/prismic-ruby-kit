@@ -1,5 +1,4 @@
 [![Gem Version](https://badge.fury.io/rb/prismic.io.png)](http://badge.fury.io/rb/prismic.io)
-[![Build Status](https://travis-ci.com/prismicio-community/ruby-kit.svg?branch=master)](https://travis-ci.com/prismicio-community/ruby-kit)
 
 ## How to contribute to this kit
 

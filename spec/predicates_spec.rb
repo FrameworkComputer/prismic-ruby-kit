@@ -5,11 +5,9 @@ Predicates = Prismic::Predicates
 
 describe 'predicates' do
   before do
-    @api = Prismic.api('https://micro.prismic.io/api', nil)
-    @master_ref = @api.master_ref
+    @api = Prismic::API.parse_api_response(JSON.parse(File.read("#{File.dirname(__FILE__)}/responses_mocks/api.json")), nil, nil, false)
     @link_resolver = Prismic.link_resolver('master'){|doc_link| "http://localhost/#{doc_link.id}" }
-    @boolean_api = Prismic.api("https://a-bool.prismic.io/api", nil)
-    @boolean_api_master_ref = @boolean_api.master_ref
+    @boolean_api = @api
   end
 
   describe 'boolean query' do 

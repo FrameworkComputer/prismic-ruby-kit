@@ -1,7 +1,7 @@
 # encoding: utf-8
 require 'spec_helper'
 
-describe 'micro' do
+describe 'micro', live: true do
   before do
     @api = Prismic.api('https://micro.prismic.io/api', nil)
     @master_ref = @api.master_ref
