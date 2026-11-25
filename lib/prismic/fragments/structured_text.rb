@@ -141,6 +141,12 @@ module Prismic
           end
 
           def as_html(link_resolver = nil, html_serializer = nil)
+            if spans.empty?
+              html = CGI.escapeHTML(text)
+              html.gsub!("\n", '<br>')
+              return html
+            end
+
             start_spans, end_spans = prepare_spans
             boundaries = boundary_positions
             html = String.new
@@ -149,15 +155,19 @@ module Prismic
 
             boundaries.each_with_index do |pos, idx|
               if (ending = end_spans[pos])
-                ending.each do
-                  tag = stack.pop
-                  inner = serialize(tag[:span], tag[:html], link_resolver, html_serializer)
-                  if stack.empty?
-                    html << inner
+                remaining = ending.length
+                reopened = []
+                while remaining > 0 && (tag = stack.pop)
+                  unless tag[:continued] && tag[:html].empty?
+                    (stack.empty? ? html : stack[-1][:html]) << serialize(tag[:span], tag[:html], link_resolver, html_serializer)
+                  end
+                  if ending.any? { |span| span.equal?(tag[:span]) }
+                    remaining -= 1
                   else
-                    stack[-1][:html] << inner
+                    reopened << tag[:span]
                   end
                 end
+                reopened.reverse_each { |span| stack.push(span: span, html: String.new, continued: true) }
               end
 
               if (starting = start_spans[pos])
@@ -169,7 +179,7 @@ module Prismic
               break if idx == last_idx
 
               next_pos = boundaries[idx + 1]
-              next if pos == next_pos
+              next if pos == next_pos || pos >= text.length
 
               escaped = cgi_escape_html(text[pos...next_pos])
               if stack.empty?
@@ -188,20 +198,17 @@ module Prismic
           end
 
           def prepare_spans
-            return [@start_spans, @end_spans] if @prepared_spans
-
-            start_spans = Hash.new { |h, k| h[k] = [] }
-            end_spans = Hash.new { |h, k| h[k] = [] }
+            start_spans = {}
+            end_spans = {}
             spans.each do |span|
-              start_spans[span.start] << span
-              end_spans[span.end] << span
+              next if span.start > text.length
+
+              (start_spans[span.start] ||= []) << span
+              (end_spans[span.end] ||= []) << span
             end
             start_spans.each_value { |s| s.sort! { |a, b| (b.end - b.start) <=> (a.end - a.start) } }
 
-            @start_spans = start_spans
-            @end_spans = end_spans
-            @prepared_spans = true
-            [@start_spans, @end_spans]
+            [start_spans, end_spans]
           end
 
           def as_text
@@ -220,6 +227,8 @@ module Prismic
           def boundary_positions
             positions = [0, text.length]
             spans.each do |span|
+              next if span.start > text.length
+
               positions << span.start
               positions << span.end
             end
