@@ -30,6 +30,74 @@ json
     document_link.lang.should == "en-us"
     document_link.broken?.should == false
   end
+
+  it "skips an unknown fetched field" do
+    json = JSON.load(<<-JSON)
+      {
+        "type": "Link.document",
+        "value": {
+          "document": {
+            "id": "UdUjvt_mqVNObPeO",
+            "type": "product",
+            "tags": [],
+            "slug": "dark-chocolate-macaron",
+            "lang": "en-us",
+            "data": {
+              "product": {
+                "name": { "type": "Text", "value": "Dark chocolate macaron" },
+                "flavour": { "type": "Unicorn", "value": "sparkles" }
+              }
+            }
+          },
+          "isBroken": false
+        }
+      }
+    JSON
+    document_link = Prismic::JsonParser.document_link_parser(json)
+    document_link.fragments.keys.should == ['name']
+  end
+end
+
+describe 'group_parser' do
+  it "skips a fragment of unknown type" do
+    json = JSON.load(<<-JSON)
+      {
+        "type": "Group",
+        "value": [
+          {
+            "title": { "type": "Text", "value": "Chapter one" },
+            "flavour": { "type": "Unicorn", "value": "sparkles" }
+          }
+        ]
+      }
+    JSON
+    group = Prismic::JsonParser.group_parser(json)
+    group[0].fragments.keys.should == ['title']
+  end
+end
+
+describe 'slices_parser' do
+  it "skips an unknown fragment in non-repeat" do
+    json = JSON.load(<<-JSON)
+      {
+        "type": "SliceZone",
+        "value": [
+          {
+            "type": "Slice",
+            "slice_type": "features",
+            "slice_label": null,
+            "non-repeat": {
+              "title": { "type": "Text", "value": "Features" },
+              "flavour": { "type": "Unicorn", "value": "sparkles" }
+            },
+            "repeat": []
+          }
+        ]
+      }
+    JSON
+    slice_zone = Prismic::JsonParser.slices_parser(json)
+    slice_zone.slices[0].non_repeat.keys.should == ['title']
+  end
 end
 
 describe 'text_parser' do
@@ -348,6 +416,35 @@ describe 'structured_text_parser' do
       @structured_text_paragraph.blocks[0].spans[1].link.should be_a Prismic::Fragments::WebLink
     end
   end
+
+  it "drops a block of unknown type" do
+    json = JSON.load(<<-JSON)
+      {
+        "type": "StructuredText",
+        "value": [
+          { "type": "paragraph", "text": "Before", "spans": [] },
+          { "type": "hologram", "text": "Ignored", "spans": [] },
+          { "type": "paragraph", "text": "After", "spans": [] }
+        ]
+      }
+    JSON
+    structured_text = Prismic::JsonParser.structured_text_parser(json)
+    structured_text.as_html(nil).should == "<p>Before</p>\n\n<p>After</p>"
+  end
+
+  it "warns once per unknown block type" do
+    json = JSON.load(<<-JSON)
+      {
+        "type": "StructuredText",
+        "value": [
+          { "type": "table", "text": "First", "spans": [] },
+          { "type": "table", "text": "Second", "spans": [] }
+        ]
+      }
+    JSON
+    Prismic::JsonParser.should_receive(:warn).with("Unknown block type: table").once
+    Prismic::JsonParser.structured_text_parser(json)
+  end
 end
 
 describe 'document_parser' do
@@ -383,6 +480,48 @@ describe 'document_parser' do
   it "correctly parses the document's fragments" do
     @document.fragments.size.should == 15
     @document.fragments['name'].should be_a Prismic::Fragments::StructuredText
+  end
+
+  it "omits a Date field with an empty value" do
+    json = JSON.load(<<-JSON)
+      {
+        "id": "WL2IziIAACIAem33",
+        "type": "event",
+        "href": "doc-url",
+        "tags": [],
+        "slugs": ["launch"],
+        "data": {
+          "event": {
+            "title": { "type": "Text", "value": "Launch" },
+            "starts_on": { "type": "Date", "value": "" }
+          }
+        }
+      }
+    JSON
+    document = Prismic::JsonParser.document_parser(json)
+    document['event.starts_on'].should be_nil
+    document['event.title'].value.should == 'Launch'
+  end
+
+  it "omits a Timestamp field with an empty value" do
+    json = JSON.load(<<-JSON)
+      {
+        "id": "WL2IziIAACIAem33",
+        "type": "event",
+        "href": "doc-url",
+        "tags": [],
+        "slugs": ["launch"],
+        "data": {
+          "event": {
+            "title": { "type": "Text", "value": "Launch" },
+            "starts_at": { "type": "Timestamp", "value": "" }
+          }
+        }
+      }
+    JSON
+    document = Prismic::JsonParser.document_parser(json)
+    document['event.starts_at'].should be_nil
+    document['event.title'].value.should == 'Launch'
   end
 end
 

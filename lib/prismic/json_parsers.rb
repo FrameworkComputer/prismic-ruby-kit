@@ -7,6 +7,7 @@ module Prismic
   module JsonParser
     class << self
       @@warned_unknown_type = []
+      @@warned_unknown_block_type = []
       def parsers
         @parsers ||= {
           'Link.document'  => method(:document_link_parser),
@@ -45,13 +46,7 @@ module Prismic
         type = doc['type']
         fragments = {}
         if doc['data'] and doc['data'][type]
-          fragments = Hash[doc['data'][type].map { |name, fragment|
-            if fragment.is_a? Array
-              [name, multiple_parser(fragment)]
-            else
-              [name, parsers[fragment['type']].call(fragment)]
-            end
-          }]
+          fragments = fragments_parser(doc['data'][type])
         end
         Prismic::Fragments::DocumentLink.new(
           doc['id'],
@@ -97,10 +92,14 @@ module Prismic
       end
 
       def date_parser(json)
+        return if json['value'].to_s.empty?
+
         Prismic::Fragments::Date.new(Time.parse(json['value']))
       end
 
       def timestamp_parser(json)
+        return if json['value'].to_s.empty?
+
         Prismic::Fragments::Timestamp.new(Time.parse(json['value']))
       end
 
@@ -148,7 +147,7 @@ module Prismic
       end
 
       def structured_text_parser(json)
-        blocks = json['value'].map do |block|
+        blocks = json['value'].filter_map do |block|
           case block['type']
           when 'paragraph'
             spans = block['spans'].map {|span| span_parser(span) }
@@ -192,15 +191,16 @@ module Prismic
               block['label']
             )
           else
-            puts "Unknown bloc type: #{block['type']}"
+            warn_unknown_block_type(block['type'])
+            nil
           end
         end
         Prismic::Fragments::StructuredText.new(blocks)
       end
 
       def multiple_parser(json)
-        fragments = json.map do |fragment|
-          parsers[fragment['type']].call(fragment)
+        fragments = json.filter_map do |fragment|
+          fragment_parser(fragment)
         end
         Prismic::Fragments::Multiple.new(fragments)
       end
@@ -208,7 +208,7 @@ module Prismic
       def group_parser(json)
         fragment_list_array = []
         json['value'].each do |group|
-          fragments = Hash[ group.map {|name, fragment| [name, parsers[fragment['type']].call(fragment)] }]
+          fragments = fragments_parser(group)
           fragment_list_array << Prismic::Fragments::GroupDocument.new(fragments)
         end
         Prismic::Fragments::Group.new(fragment_list_array)
@@ -222,12 +222,10 @@ module Prismic
           slice_label = data['slice_label']
 
           if data.key?('value')
-            slices << Prismic::Fragments::SimpleSlice.new(slice_type, slice_label, fragment_parser(data['value']))
+            value = fragment_parser(data['value'])
+            slices << Prismic::Fragments::SimpleSlice.new(slice_type, slice_label, value) if value
           else
-            non_repeat = {}
-            data['non-repeat'].each do |fragment_key, fragment_value|
-              non_repeat[fragment_key] = fragment_parser(fragment_value)
-            end
+            non_repeat = fragments_parser(data['non-repeat'])
 
             repeat = group_parser({ 'type' => 'Group', 'value' => data['repeat']})
 
@@ -240,8 +238,11 @@ module Prismic
       def fragment_parser(fragment)
         if fragment.is_a? Array
           multiple_parser(fragment)
+        elsif (parser = parsers[fragment['type']])
+          parser.call(fragment)
         else
-          parsers[fragment['type']].call(fragment)
+          warn_unknown_type(fragment['type'])
+          nil
         end
       end
 
@@ -252,16 +253,6 @@ module Prismic
       def document_parser(json)
         data_json = json['data'].values.first  # {"doc_type": data}
 
-        # Removing the unknown types + sending a warning, once
-        data_json.select!{ |_, fragment|
-          known_type = fragment.is_a?(Array) || parsers.include?(fragment['type'])
-          if !known_type && !@@warned_unknown_type.include?(fragment['type'])
-            warn "Type #{fragment['type']} is unknown, fragment was skipped; perhaps you should update your prismic.io gem?"
-            @@warned_unknown_type << fragment['type']
-          end
-          known_type
-        }
-
         alternate_languages = nil
         if json.key?('alternate_languages')
           alternate_languages = Hash[json['alternate_languages'].map { |doc|
@@ -269,9 +260,7 @@ module Prismic
           }]
         end
 
-        fragments = Hash[data_json.map { |name, fragment|
-          [name, fragment_parser(fragment)]
-        }]
+        fragments = fragments_parser(data_json)
 
         Prismic::Document.new(
             json['id'],
@@ -308,6 +297,27 @@ module Prismic
       end
 
       private
+
+      def fragments_parser(json)
+        json.filter_map do |name, fragment|
+          parsed = fragment_parser(fragment)
+          [name, parsed] if parsed
+        end.to_h
+      end
+
+      def warn_unknown_type(type)
+        return if @@warned_unknown_type.include?(type)
+
+        warn "Type #{type} is unknown, fragment was skipped; perhaps you should update your prismic.io gem?"
+        @@warned_unknown_type << type
+      end
+
+      def warn_unknown_block_type(type)
+        return if @@warned_unknown_block_type.include?(type)
+
+        warn "Unknown block type: #{type}"
+        @@warned_unknown_block_type << type
+      end
 
       def view_parser(json)
         Prismic::Fragments::Image::View.new(json['url'],
