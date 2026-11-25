@@ -17,7 +17,7 @@ describe 'OAuth' do
     client_secret: "client_secret",
   }
 
-  describe "Public API" do
+  describe "Public API", live: true do
 
     PUBLIC_URL = "https://micro.prismic.io/api"
 
@@ -69,71 +69,42 @@ describe 'OAuth' do
 
   describe "Private API" do
 
-    PRIVATE_URL = "https://privaterepository.prismic.io/api"
+    let(:url) { "https://private.prismic.io/api" }
+    let(:auth_error_body) do
+      JSON.dump(
+        error: "Invalid access token",
+        oauth_initiate: "https://private.prismic.io/auth",
+        oauth_token: "https://private.prismic.io/auth/token",
+      )
+    end
+    let(:http_client) { double(get: double(code: '401', body: auth_error_body, message: 'Unauthorized')) }
+    let(:api_opts) { { http_client: http_client, api_cache: Prismic::BasicNullCache.new } }
 
-    it "should deny unauthenticated requests" do
+    it "raises an auth error carrying the oauth endpoints" do
       expect {
-        Prismic.api(PRIVATE_URL, nil)
-      }.to raise_error(Prismic::API::PrismicWSAuthError)
+        Prismic.api(url, api_opts)
+      }.to raise_error(Prismic::API::PrismicWSAuthError) { |error|
+        error.message.should == "Can't connect to Prismic's API: Invalid access token"
+        error.oauth.initiate.should == "https://private.prismic.io/auth"
+        error.oauth.token.should == "https://private.prismic.io/auth/token"
+      }
     end
 
-    def catch_wserror(url)
-      Prismic.api(url, nil)
-    rescue Prismic::API::PrismicWSAuthError => e
-      e
+    it "builds the oauth initiate URL from the auth error" do
+      initiate_url = Prismic.oauth_initiate_url(url, OAUTH_INITIATE_OPTS, api_opts)
+      expected_url = [
+        "https://private.prismic.io/auth?client_id=client_id",
+        "redirect_uri=http%3A%2F%2Fmyapp.com%2Fcallback",
+        "scope=master%2Breleases",
+      ].join("&")
+      initiate_url.should == expected_url
     end
 
-    it "should provide the error" do
-      error = catch_wserror(PRIVATE_URL)
-      error.message.should == "Can't connect to Prismic's API: "
-    end
-
-    it "should provide oauth entry points" do
-      error = catch_wserror(PRIVATE_URL)
-      error.oauth.initiate.should == "https://privaterepository.prismic.io/auth"
-    end
-
-    it "should provide oauth token" do
-      error = catch_wserror(PRIVATE_URL)
-      error.oauth.token.should == "https://privaterepository.prismic.io/auth/token"
-    end
-
-    describe "oauth_initiate_url" do
-
-      it "should returns the URL" do
-        url = Prismic.oauth_initiate_url(PRIVATE_URL, OAUTH_INITIATE_OPTS)
-        expected_url = [
-          "https://privaterepository.prismic.io/auth?client_id=client_id",
-          "redirect_uri=http%3A%2F%2Fmyapp.com%2Fcallback",
-          "scope=master%2Breleases",
-        ].join("&")
-        url.should == expected_url
-      end
-
-      it "should returns the URL (with access_token)" do
-        url = Prismic.oauth_initiate_url(PRIVATE_URL, OAUTH_INITIATE_OPTS, "token")
-        expected_url = [
-          "https://privaterepository.prismic.io/auth?client_id=client_id",
-          "redirect_uri=http%3A%2F%2Fmyapp.com%2Fcallback",
-          "scope=master%2Breleases",
-        ].join("&")
-        url.should == expected_url
-      end
-
-    end
-
-    describe "oauth_check_token" do
-
-      it "should returns the URL" do
-        expect {
-          Prismic::API.oauth_check_token(PRIVATE_URL, OAUTH_CHECKTOKEN_OPTS)
-        }.to raise_error(
-          # we don't want to get a PrismicWSAuthError error here
-          Prismic::API::PrismicWSConnectionError,
-          "Can't connect to Prismic's API: 400 Bad Request"
-        )
-      end
-
+    it "checks the token against the endpoint from the auth error" do
+      http_client.should_receive(:post)
+        .with("https://private.prismic.io/auth/token", OAUTH_CHECKTOKEN_OPTS)
+        .and_return(double(code: '200', body: JSON.dump(access_token: "the_access_token")))
+      Prismic.oauth_check_token(url, OAUTH_CHECKTOKEN_OPTS, api_opts).should == "the_access_token"
     end
 
   end

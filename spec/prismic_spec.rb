@@ -262,7 +262,7 @@ describe 'Api' do
     def redirect_uri_encoded
       CGI.escape(@redirect_uri)
     end
-    it 'build a valid url' do
+    it 'build a valid url', live: true do
       oauth_initiate_url.should == "https://micro.prismic.io/auth?client_id=#@client_id&redirect_uri=#{redirect_uri_encoded}&scope=#@scope"
     end
   end

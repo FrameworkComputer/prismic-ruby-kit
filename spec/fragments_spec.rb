@@ -766,7 +766,7 @@ describe 'Multiple' do
   end
 end
 
-describe 'Group' do
+describe 'Group', live: true do
   before do
     @micro_api = Prismic.api('https://micro.prismic.io/api', nil)
     @master_ref = @micro_api.master_ref
