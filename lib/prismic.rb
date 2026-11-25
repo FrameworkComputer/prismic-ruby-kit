@@ -624,7 +624,7 @@ module Prismic
       # - code: returns the response's HTTP status code (as number or String)
       # - body: returns the response's body (as String)
       def get(uri, data={}, headers={})
-        uri = URI(uri) if uri.is_a?(String)
+        uri = uri.is_a?(String) ? URI(uri) : uri.dup
         add_query(uri, data)
         http = Net::HTTP.new(uri.host, uri.port)
         http.use_ssl = uri.scheme =~ /https/i
@@ -637,7 +637,7 @@ module Prismic
       # - code: returns the response's HTTP status code (as number or String)
       # - body: returns the response's body (as String)
       def post(uri, data={}, headers={})
-        uri = URI(uri) if uri.is_a?(String)
+        uri = uri.is_a?(String) ? URI(uri) : uri.dup
         add_query(uri, data)
         http = Net::HTTP.new(uri.host, uri.port)
         http.use_ssl = uri.scheme =~ /https/i
