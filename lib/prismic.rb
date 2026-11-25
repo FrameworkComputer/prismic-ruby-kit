@@ -13,6 +13,8 @@ module Prismic
 
   PREVIEW_COOKIE = 'io.prismic.preview'
 
+  URL_PATTERN = /\A#{URI::RFC2396_PARSER.make_regexp(%w[http https])}\z/
+
   # These exception can contains an error cause and is able to show them
   class Error < Exception
     attr_reader :cause
@@ -63,9 +65,7 @@ module Prismic
   #
   # @return [API] The API instance related to this repository
   def self.api(url, opts=nil)
-    if (not url =~ /\A#{URI::regexp(['http', 'https'])}\z/)
-      raise ArgumentError.new("Valid web URI expected")
-    end
+    raise ArgumentError, 'Valid web URI expected' unless URL_PATTERN.match?(url.to_s)
     opts ||= {}
     opts = {access_token: opts} if opts.is_a?(String)
     API.start(url, opts)

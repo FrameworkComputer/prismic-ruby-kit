@@ -1,11 +1,5 @@
 # encoding: utf-8
 require 'nokogiri'
-begin
-  require 'yajl/json_gem'
-rescue LoadError
-  # ok not a big deal
-  require 'json'
-end
 
 RSpec.configure do |c|
   # Stop after the first failure
